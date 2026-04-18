@@ -3,7 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
 from medistock.domain.models.patient import Patient
-from medistock.interfaces.api.dependencies import get_patient_repository
+from medistock.interfaces.api.db_dependencies import get_patient_repository
 
 router = APIRouter(prefix="/patients", tags=["Patients"])
 

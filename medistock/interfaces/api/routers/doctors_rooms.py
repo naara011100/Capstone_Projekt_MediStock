@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
 from medistock.domain.models.doctor import Doctor
 from medistock.domain.models.room import Room
-from medistock.interfaces.api.dependencies import get_doctor_repository, get_room_repository
+from medistock.interfaces.api.db_dependencies import get_doctor_repository, get_room_repository
 
 doctors_router = APIRouter(prefix="/doctors", tags=["Doctors"])
 rooms_router = APIRouter(prefix="/rooms", tags=["Rooms"])

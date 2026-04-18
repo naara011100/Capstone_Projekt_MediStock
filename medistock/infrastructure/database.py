@@ -1,8 +1,13 @@
 import os
 from typing import Generator
 
+from dotenv import load_dotenv
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
+
+# Load .env before reading any env vars so local development works without
+# having to export DATABASE_URL manually in the shell.
+load_dotenv()
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",

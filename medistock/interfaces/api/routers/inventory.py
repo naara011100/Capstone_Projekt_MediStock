@@ -2,7 +2,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from medistock.domain.models.medication import Medication
-from medistock.interfaces.api.dependencies import (
+from medistock.interfaces.api.db_dependencies import (
     get_inventory_service,
     get_medication_repository,
 )

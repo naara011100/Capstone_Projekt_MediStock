@@ -1,9 +1,13 @@
 import os
 from logging.config import fileConfig
 
+from dotenv import load_dotenv
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
+
+# Load .env so `alembic` CLI picks up DATABASE_URL without a manual export.
+load_dotenv()
 
 # ---------------------------------------------------------------------------
 # Import ORM Base so Alembic can detect all mapped tables automatically.
