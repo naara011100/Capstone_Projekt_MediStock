@@ -1,0 +1,60 @@
+# ── Python ─────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.so
+
+# ── Distribution / packaging ────────────────────────────────────────────────
+dist/
+build/
+*.egg-info/
+*.egg
+MANIFEST
+wheels/
+
+# ── Virtual environments ────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+.Python
+
+# ── Environment / secrets — NEVER commit these ─────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ── pytest / coverage ───────────────────────────────────────────────────────
+.pytest_cache/
+.cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# ── mypy / type checkers ────────────────────────────────────────────────────
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+
+# ── IDEs ────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── OS noise ────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Docker ──────────────────────────────────────────────────────────────────
+# (docker-compose.yml and Dockerfile ARE tracked; only ignore local overrides)
+docker-compose.override.yml
+
+# ── Alembic compiled cache ──────────────────────────────────────────────────
+alembic/versions/__pycache__/

@@ -1,0 +1,30 @@
+name: CD — Deploy to Render
+
+# Runs automatically once the Release workflow completes successfully.
+on:
+  workflow_run:
+    workflows: ["Release"]
+    types:
+      - completed
+
+jobs:
+  deploy:
+    name: Trigger Render Deployment
+    runs-on: ubuntu-latest
+
+    # Only deploy when the Release job actually succeeded
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Trigger Render deploy hook
+        # RENDER_DEPLOY_HOOK_URL must be added as a GitHub Actions secret.
+        # In Render: Dashboard → your service → Settings → Deploy Hook → copy URL.
+        run: |
+          curl -fsSL -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}" \
+            -o /dev/null \
+            -w "HTTP status: %{http_code}\n"
+
+      - name: Log deployed tag
+        run: |
+          echo "Deployed tag: ${{ github.event.workflow_run.head_branch }}"
+          echo "Triggered by commit: ${{ github.event.workflow_run.head_sha }}"

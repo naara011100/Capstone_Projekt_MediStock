@@ -1,0 +1,35 @@
+services:
+
+  # ── PostgreSQL ────────────────────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       medistock
+      POSTGRES_USER:     medistock
+      POSTGRES_PASSWORD: medistock
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medistock -d medistock"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── MediStock API ─────────────────────────────────────────────────────────
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://medistock:medistock@db:5432/medistock
+      WORKERS: "2"
+    depends_on:
+      db:
+        condition: service_healthy   # wait until Postgres accepts connections
+
+volumes:
+  postgres_data:
