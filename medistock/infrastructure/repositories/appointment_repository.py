@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from medistock.domain.models.appointment import Appointment, AppointmentStatus
 from medistock.domain.services import AbstractAppointmentRepository
 from medistock.infrastructure.orm.models import AppointmentORM
-from medistock.infrastructure.repositories.base import appointment_to_orm, build_appointment
+from medistock.infrastructure.repositories.base import appointment_to_orm, build_appointment, safe_commit
 
 
 class SQLAlchemyAppointmentRepository(AbstractAppointmentRepository):
@@ -25,8 +25,8 @@ class SQLAlchemyAppointmentRepository(AbstractAppointmentRepository):
     # ------------------------------------------------------------------
 
     def save(self, appointment: Appointment) -> None:
-        self._db.merge(appointment_to_orm(appointment))
-        self._db.commit()
+        with safe_commit(self._db):
+            self._db.merge(appointment_to_orm(appointment))
 
     # ------------------------------------------------------------------
     # Reads

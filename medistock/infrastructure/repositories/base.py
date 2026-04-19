@@ -7,7 +7,27 @@ out of the database was already validated on write; re-running creation-
 time guards (e.g. "scheduled_at must be in the future") would incorrectly
 reject perfectly valid historical records.
 """
+from contextlib import contextmanager
 from datetime import datetime
+
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+class DuplicateEntryError(Exception):
+    """Raised when a DB unique constraint is violated during save()."""
+
+
+@contextmanager
+def safe_commit(db: Session):
+    """Commit the session; on IntegrityError roll back and raise DuplicateEntryError."""
+    try:
+        yield
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise DuplicateEntryError(str(exc.orig)) from exc
+
+
 from medistock.domain.models.appointment import Appointment, AppointmentStatus
 from medistock.domain.models.doctor import Doctor
 from medistock.domain.models.medication import Medication

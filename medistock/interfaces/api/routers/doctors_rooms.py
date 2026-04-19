@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
 from medistock.domain.models.doctor import Doctor
 from medistock.domain.models.room import Room
+from medistock.infrastructure.repositories.base import DuplicateEntryError
 from medistock.interfaces.api.db_dependencies import get_doctor_repository, get_room_repository
 
 doctors_router = APIRouter(prefix="/doctors", tags=["Doctors"])
@@ -55,7 +56,10 @@ def create_doctor(payload: DoctorCreate, repo=Depends(get_doctor_repository)):
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
-    repo.save(doctor)
+    try:
+        repo.save(doctor)
+    except DuplicateEntryError:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A doctor with this email already exists.")
     return _doctor_to_response(doctor)
 
 
@@ -113,7 +117,10 @@ def create_room(payload: RoomCreate, repo=Depends(get_room_repository)):
         room = Room(name=payload.name, floor=payload.floor, capacity=payload.capacity)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
-    repo.save(room)
+    try:
+        repo.save(room)
+    except DuplicateEntryError:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A room with this name already exists.")
     return _room_to_response(room)
 
 

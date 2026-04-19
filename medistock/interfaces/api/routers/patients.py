@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr
 from medistock.domain.models.patient import Patient
+from medistock.infrastructure.repositories.base import DuplicateEntryError
 from medistock.interfaces.api.db_dependencies import get_patient_repository
 
 router = APIRouter(prefix="/patients", tags=["Patients"])
@@ -54,7 +55,10 @@ def create_patient(payload: PatientCreate, repo=Depends(get_patient_repository))
         )
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
-    repo.save(patient)
+    try:
+        repo.save(patient)
+    except DuplicateEntryError:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A patient with this email already exists.")
     return _to_response(patient)
 
 

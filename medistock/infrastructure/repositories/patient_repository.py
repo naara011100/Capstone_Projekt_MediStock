@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 
 from medistock.domain.models.patient import Patient
 from medistock.infrastructure.orm.models import PatientORM
-from medistock.infrastructure.repositories.base import build_patient, patient_to_orm
+from medistock.infrastructure.repositories.base import build_patient, patient_to_orm, safe_commit
 
 
 class SQLAlchemyPatientRepository:
@@ -12,8 +12,8 @@ class SQLAlchemyPatientRepository:
         self._db = db
 
     def save(self, patient: Patient) -> None:
-        self._db.merge(patient_to_orm(patient))
-        self._db.commit()
+        with safe_commit(self._db):
+            self._db.merge(patient_to_orm(patient))
 
     def get_by_id(self, patient_id: UUID) -> Patient | None:
         row = self._db.get(PatientORM, patient_id)

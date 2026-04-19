@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from medistock.domain.models.stock_item import StockItem
 from medistock.domain.services import AbstractStockRepository
 from medistock.infrastructure.orm.models import StockItemORM
-from medistock.infrastructure.repositories.base import build_stock_item, stock_item_to_orm
+from medistock.infrastructure.repositories.base import build_stock_item, stock_item_to_orm, safe_commit
 
 
 class SQLAlchemyStockRepository(AbstractStockRepository):
@@ -24,8 +24,8 @@ class SQLAlchemyStockRepository(AbstractStockRepository):
     # ------------------------------------------------------------------
 
     def save(self, stock_item: StockItem) -> None:
-        self._db.merge(stock_item_to_orm(stock_item))
-        self._db.commit()
+        with safe_commit(self._db):
+            self._db.merge(stock_item_to_orm(stock_item))
 
     # ------------------------------------------------------------------
     # Reads

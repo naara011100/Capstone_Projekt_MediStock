@@ -2,6 +2,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from medistock.domain.models.medication import Medication
+from medistock.infrastructure.repositories.base import DuplicateEntryError
 from medistock.interfaces.api.db_dependencies import (
     get_inventory_service,
     get_medication_repository,
@@ -77,7 +78,10 @@ def create_medication(payload: MedicationCreate, repo=Depends(get_medication_rep
         med = Medication(name=payload.name, description=payload.description, unit=payload.unit)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
-    repo.save(med)
+    try:
+        repo.save(med)
+    except DuplicateEntryError:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="A medication with this name already exists.")
     return _med_to_response(med)
 
 
