@@ -2,13 +2,9 @@ from datetime import datetime
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from medistock.application.use_cases import BookingUseCase
 from medistock.domain.models.appointment import AppointmentStatus
-from medistock.interfaces.api.db_dependencies import (
-    get_booking_service,
-    get_patient_repository,
-    get_doctor_repository,
-    get_room_repository,
-)
+from medistock.interfaces.api.db_dependencies import get_booking_use_case
 
 router = APIRouter(prefix="/appointments", tags=["Appointments"])
 
@@ -55,80 +51,84 @@ def _to_response(appt) -> AppointmentResponse:
 @router.post("/", response_model=AppointmentResponse, status_code=status.HTTP_201_CREATED)
 def book_appointment(
     payload: AppointmentCreate,
-    service=Depends(get_booking_service),
-    patient_repo=Depends(get_patient_repository),
-    doctor_repo=Depends(get_doctor_repository),
-    room_repo=Depends(get_room_repository),
+    use_case: BookingUseCase = Depends(get_booking_use_case),
 ):
-    patient = patient_repo.get_by_id(payload.patient_id)
-    if not patient:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Patient not found.")
-    doctor = doctor_repo.get_by_id(payload.doctor_id)
-    if not doctor:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Doctor not found.")
-    room = room_repo.get_by_id(payload.room_id)
-    if not room:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Room not found.")
-
     try:
-        appt = service.book_appointment(
-            patient=patient,
-            doctor=doctor,
-            room=room,
+        appt = use_case.book(
+            patient_id=payload.patient_id,
+            doctor_id=payload.doctor_id,
+            room_id=payload.room_id,
             scheduled_at=payload.scheduled_at,
             duration_minutes=payload.duration_minutes,
             notes=payload.notes,
         )
+    except LookupError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     return _to_response(appt)
 
 
 @router.get("/", response_model=list[AppointmentResponse])
-def list_appointments(service=Depends(get_booking_service)):
-    return [_to_response(a) for a in service._repo.list_all()]
+def list_appointments(use_case: BookingUseCase = Depends(get_booking_use_case)):
+    return [_to_response(a) for a in use_case.list_all()]
 
 
 @router.get("/{appointment_id}", response_model=AppointmentResponse)
-def get_appointment(appointment_id: UUID, service=Depends(get_booking_service)):
+def get_appointment(
+    appointment_id: UUID,
+    use_case: BookingUseCase = Depends(get_booking_use_case),
+):
     try:
-        appt = service.get_appointment(appointment_id)
+        appt = use_case.get(appointment_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     return _to_response(appt)
 
 
 @router.patch("/{appointment_id}/confirm", response_model=AppointmentResponse)
-def confirm_appointment(appointment_id: UUID, service=Depends(get_booking_service)):
+def confirm_appointment(
+    appointment_id: UUID,
+    use_case: BookingUseCase = Depends(get_booking_use_case),
+):
     try:
-        appt = service.confirm_appointment(appointment_id)
+        appt = use_case.confirm(appointment_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     return _to_response(appt)
 
 
 @router.patch("/{appointment_id}/complete", response_model=AppointmentResponse)
-def complete_appointment(appointment_id: UUID, service=Depends(get_booking_service)):
+def complete_appointment(
+    appointment_id: UUID,
+    use_case: BookingUseCase = Depends(get_booking_use_case),
+):
     try:
-        appt = service.complete_appointment(appointment_id)
+        appt = use_case.complete(appointment_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     return _to_response(appt)
 
 
 @router.patch("/{appointment_id}/cancel", response_model=AppointmentResponse)
-def cancel_appointment(appointment_id: UUID, service=Depends(get_booking_service)):
+def cancel_appointment(
+    appointment_id: UUID,
+    use_case: BookingUseCase = Depends(get_booking_use_case),
+):
     try:
-        appt = service.cancel_appointment(appointment_id)
+        appt = use_case.cancel(appointment_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     return _to_response(appt)
 
 
 @router.patch("/{appointment_id}/no-show", response_model=AppointmentResponse)
-def mark_no_show(appointment_id: UUID, service=Depends(get_booking_service)):
+def mark_no_show(
+    appointment_id: UUID,
+    use_case: BookingUseCase = Depends(get_booking_use_case),
+):
     try:
-        appt = service.mark_no_show(appointment_id)
+        appt = use_case.mark_no_show(appointment_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     return _to_response(appt)

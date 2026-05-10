@@ -1,10 +1,11 @@
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
+from medistock.application.use_cases import InventoryUseCase
 from medistock.domain.models.medication import Medication
 from medistock.infrastructure.repositories.base import DuplicateEntryError
 from medistock.interfaces.api.db_dependencies import (
-    get_inventory_service,
+    get_inventory_use_case,
     get_medication_repository,
 )
 
@@ -70,7 +71,7 @@ def _stock_to_response(s) -> StockItemResponse:
     )
 
 
-# ---------- Medication endpoints ----------
+# ---------- Medication endpoints (simple CRUD — no orchestration) ----------
 
 @router.post("/medications", response_model=MedicationResponse, status_code=status.HTTP_201_CREATED)
 def create_medication(payload: MedicationCreate, repo=Depends(get_medication_repository)):
@@ -98,29 +99,27 @@ def get_medication(medication_id: UUID, repo=Depends(get_medication_repository))
     return _med_to_response(med)
 
 
-# ---------- Stock endpoints ----------
+# ---------- Stock endpoints (orchestrated via InventoryUseCase) ----------
 
 @router.get("/stock", response_model=list[StockItemResponse])
-def list_stock(service=Depends(get_inventory_service)):
-    return [_stock_to_response(s) for s in service.list_all_stock()]
+def list_stock(use_case: InventoryUseCase = Depends(get_inventory_use_case)):
+    return [_stock_to_response(s) for s in use_case.list_all_stock()]
 
 
 @router.get("/stock/low-stock", response_model=list[StockItemResponse])
-def list_low_stock(service=Depends(get_inventory_service)):
-    return [_stock_to_response(s) for s in service.get_low_stock_alerts()]
+def list_low_stock(use_case: InventoryUseCase = Depends(get_inventory_use_case)):
+    return [_stock_to_response(s) for s in use_case.get_low_stock_alerts()]
 
 
 @router.post("/stock/add", response_model=StockItemResponse)
 def add_stock(
     payload: StockAddRequest,
-    service=Depends(get_inventory_service),
-    med_repo=Depends(get_medication_repository),
+    use_case: InventoryUseCase = Depends(get_inventory_use_case),
 ):
-    medication = med_repo.get_by_id(payload.medication_id)
-    if not medication:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Medication not found.")
     try:
-        item = service.add_stock(medication=medication, amount=payload.amount, location=payload.location)
+        item = use_case.add_stock(payload.medication_id, payload.amount, payload.location)
+    except LookupError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     return _stock_to_response(item)
@@ -129,14 +128,12 @@ def add_stock(
 @router.post("/stock/dispense", response_model=StockItemResponse)
 def dispense_stock(
     payload: StockDispenseRequest,
-    service=Depends(get_inventory_service),
-    med_repo=Depends(get_medication_repository),
+    use_case: InventoryUseCase = Depends(get_inventory_use_case),
 ):
-    medication = med_repo.get_by_id(payload.medication_id)
-    if not medication:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Medication not found.")
     try:
-        item = service.dispense(medication=medication, amount=payload.amount)
+        item = use_case.dispense(payload.medication_id, payload.amount)
+    except LookupError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
     return _stock_to_response(item)

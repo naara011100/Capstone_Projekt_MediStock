@@ -13,6 +13,7 @@ The DATABASE_URL environment variable controls which PostgreSQL instance is used
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
+from medistock.application.use_cases import BookingUseCase, InventoryUseCase
 from medistock.domain.services import BookingService, InventoryService
 from medistock.infrastructure.database import get_db
 from medistock.infrastructure.repositories.appointment_repository import SQLAlchemyAppointmentRepository
@@ -45,3 +46,19 @@ def get_booking_service(db: Session = Depends(get_db)) -> BookingService:
 
 def get_inventory_service(db: Session = Depends(get_db)) -> InventoryService:
     return InventoryService(SQLAlchemyStockRepository(db))
+
+
+def get_booking_use_case(db: Session = Depends(get_db)) -> BookingUseCase:
+    return BookingUseCase(
+        service=BookingService(SQLAlchemyAppointmentRepository(db)),
+        patient_repo=SQLAlchemyPatientRepository(db),
+        doctor_repo=SQLAlchemyDoctorRepository(db),
+        room_repo=SQLAlchemyRoomRepository(db),
+    )
+
+
+def get_inventory_use_case(db: Session = Depends(get_db)) -> InventoryUseCase:
+    return InventoryUseCase(
+        service=InventoryService(SQLAlchemyStockRepository(db)),
+        medication_repo=SQLAlchemyMedicationRepository(db),
+    )
