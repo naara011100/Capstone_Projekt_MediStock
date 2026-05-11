@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 from uuid import UUID, uuid4
 from .doctor import Doctor
@@ -27,6 +27,12 @@ class Appointment:
     updated_at: datetime = field(default_factory=datetime.utcnow)
 
     def __post_init__(self):
+        # Normalize to naive UTC so comparisons work regardless of whether the
+        # caller supplied a timezone-aware or naive datetime.
+        if self.scheduled_at.tzinfo is not None:
+            self.scheduled_at = (
+                self.scheduled_at.astimezone(timezone.utc).replace(tzinfo=None)
+            )
         if self.scheduled_at <= datetime.utcnow():
             raise ValueError("Appointment must be scheduled in the future.")
         if self.duration_minutes <= 0:

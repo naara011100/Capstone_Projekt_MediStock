@@ -546,7 +546,10 @@ window.apptAction = async function(id, action) {
 document.getElementById('form-appointment').addEventListener('submit', async e => {
   e.preventDefault();
   const d = formData(e.target);
-  d.scheduled_at = new Date(d.scheduled_at).toISOString();
+  // Send naive ISO (no Z / timezone offset) so the backend receives a
+  // timezone-naive datetime that matches datetime.utcnow() comparisons.
+  // datetime-local values are "YYYY-MM-DDTHH:MM"; append ":00" for seconds.
+  if (d.scheduled_at && d.scheduled_at.length === 16) d.scheduled_at += ':00';
   d.duration_minutes = parseInt(d.duration_minutes, 10);
   try {
     await api('POST', '/appointments/', d);
