@@ -189,6 +189,39 @@
     @keyframes slideIn { from { transform: translateX(110%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
     .divider { border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+
+    /* ── Dashboard ───────────────────────────────────────────────────────────── */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+    @media (max-width: 640px) { .stat-grid { grid-template-columns: 1fr; } }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 4px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .stat-card.warn  { border-left-color: #f59e0b; }
+    .stat-card.alert { border-left-color: var(--error); }
+
+    .stat-icon  { font-size: 1.4rem; margin-bottom: 4px; }
+    .stat-value { font-size: 2.4rem; font-weight: 700; line-height: 1; color: var(--text); }
+    .stat-label { font-size: .82rem; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
+
+    .dash-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 768px) { .dash-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
@@ -196,7 +229,8 @@
 <header><h1>MediStock</h1></header>
 
 <nav id="tab-nav">
-  <button class="active" data-tab="patients">Patients</button>
+  <button class="active" data-tab="dashboard">Dashboard</button>
+  <button data-tab="patients">Patients</button>
   <button data-tab="doctors">Doctors</button>
   <button data-tab="appointments">Appointments</button>
   <button data-tab="inventory">Inventory</button>
@@ -204,8 +238,49 @@
 
 <main>
 
+  <!-- ══════════════ DASHBOARD ══════════════ -->
+  <div class="tab-panel active" id="tab-dashboard">
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-icon">👤</div>
+        <div class="stat-value" id="dash-patients">—</div>
+        <div class="stat-label">Total Patients</div>
+      </div>
+      <div class="stat-card warn">
+        <div class="stat-icon">📅</div>
+        <div class="stat-value" id="dash-today">—</div>
+        <div class="stat-label">Today's Appointments</div>
+      </div>
+      <div class="stat-card alert">
+        <div class="stat-icon">⚠️</div>
+        <div class="stat-value" id="dash-lowstock">—</div>
+        <div class="stat-label">Low Stock Alerts</div>
+      </div>
+    </div>
+    <div class="dash-grid">
+      <div class="card">
+        <h2>Today's Appointments</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Patient</th><th>Doctor</th><th>Time</th><th>Status</th></tr></thead>
+            <tbody id="dash-tbl-appointments"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Low Stock Alerts</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Medication</th><th>Location</th><th>Qty</th></tr></thead>
+            <tbody id="dash-tbl-lowstock"><tr><td colspan="3" class="empty">Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ══════════════ PATIENTS ══════════════ -->
-  <div class="tab-panel active" id="tab-patients">
+  <div class="tab-panel" id="tab-patients">
     <div class="grid">
       <div class="card">
         <h2>Add Patient</h2>
@@ -625,9 +700,64 @@ document.getElementById('form-stock-dispense').addEventListener('submit', async 
   } catch (err) { toast(err.message, 'error'); }
 });
 
+// ════════════════════════════════════════════════════════════════════════════
+//  DASHBOARD
+// ════════════════════════════════════════════════════════════════════════════
+async function loadDashboard() {
+  const todayStr = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+
+  const [patients, appointments, lowStock] = await Promise.all([
+    api('GET', '/patients/'),
+    api('GET', '/appointments/'),
+    api('GET', '/inventory/stock/low-stock'),
+  ]);
+
+  // ── Stat numbers ──────────────────────────────────────────────────────────
+  const activePatients = patients.filter(p => p.is_active);
+  const todayAppts = appointments.filter(a => {
+    // scheduled_at is "YYYY-MM-DDTHH:MM:SS" — compare the date part only
+    return a.scheduled_at.slice(0, 10) === todayStr &&
+           ['scheduled', 'confirmed'].includes(a.status);
+  });
+
+  document.getElementById('dash-patients').textContent  = activePatients.length;
+  document.getElementById('dash-today').textContent     = todayAppts.length;
+  document.getElementById('dash-lowstock').textContent  = lowStock.length;
+
+  // ── Today's appointments table ─────────────────────────────────────────────
+  const apptTbody = document.getElementById('dash-tbl-appointments');
+  if (!todayAppts.length) {
+    apptTbody.innerHTML = '<tr><td colspan="4" class="empty">No appointments today.</td></tr>';
+  } else {
+    apptTbody.innerHTML = todayAppts
+      .sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at))
+      .map(a => `
+        <tr>
+          <td>${esc(a.patient_name)}</td>
+          <td>${esc(a.doctor_name)}</td>
+          <td>${a.scheduled_at.slice(11, 16)}</td>
+          <td>${statusBadge(a.status)}</td>
+        </tr>`).join('');
+  }
+
+  // ── Low stock table ────────────────────────────────────────────────────────
+  const stockTbody = document.getElementById('dash-tbl-lowstock');
+  if (!lowStock.length) {
+    stockTbody.innerHTML = '<tr><td colspan="3" class="empty">All stock levels OK.</td></tr>';
+  } else {
+    stockTbody.innerHTML = lowStock.map(item => `
+      <tr>
+        <td>${esc(item.medication_name)}</td>
+        <td>${esc(item.location)}</td>
+        <td><strong style="color:${item.is_out_of_stock ? 'var(--error)' : '#d97706'}">${item.quantity}</strong></td>
+      </tr>`).join('');
+  }
+}
+
 // ── Boot ─────────────────────────────────────────────────────────────────────
 (async () => {
   await Promise.allSettled([
+    loadDashboard(),
     loadPatients(),
     loadDoctors(),
     loadRooms(),
