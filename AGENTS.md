@@ -59,6 +59,15 @@ Every prompt sent to Claude Code that produced a project artifact:
 | 12 | Develop | Application layer (use cases) + wire into routers | use_cases.py, updated appointments + inventory routers |
 | 13 | Develop | Add application layer docs + use case specs | docs/PROJECT.md, UC-001, UC-002, docs/TASKS.md |
 | 14 | Develop | AI-SDLC restructure: skills/ folder + new AGENTS.md | skills/*.md, AGENTS.md (this file), scripts/setup-skills.sh |
+| 15 | Deploy | Commit and push all current changes to GitHub | Verified clean tree; confirmed .env not tracked; pushed |
+| 16 | Validate | CI workflow failing on unit tests — check logs and fix | Identified `--no-cache-dir` + `cache: "pip"` contradiction; removed flag from ci.yml |
+| 17 | Validate | Appointment booking returns 500 — debug and fix | Diagnosed `TypeError` from timezone-aware vs naive datetime comparison; fixed appointment.py + index.html |
+| 18 | Deploy | Create and push git tag v1.0.0 to trigger Release + CD | Tag pushed; Release (GHCR) and CD (Render) pipelines triggered |
+| 19 | Deploy | CD workflow failing — what secret does it expect? | Read cd.yml; identified required secret: `RENDER_DEPLOY_HOOK_URL` |
+| 20 | Deploy | git tag v1.0.2 + git push origin v1.0.2 | Tag pushed after Render secret was configured |
+| 21 | Develop | Add Mermaid architecture diagram to docs/PROJECT.md | Replaced ASCII box diagram with colour-coded Mermaid `graph TD` |
+| 22 | Develop | Document /health endpoint in README.md + live API badge | Full README with CI badge, shields.io health badge, endpoint docs, quick-start |
+| 23 | Develop | Update AGENTS.md with last session prompts | This entry — prompts 15–23 added, lessons 7–8 added |
 
 ---
 
@@ -98,6 +107,10 @@ Every prompt sent to Claude Code that produced a project artifact:
 | `BookingUseCase` + `InventoryUseCase` | Derived from workflow in `book_appointment` router endpoint |
 | `docs/PROJECT.md` + use case specs | Synthesised from all project artefacts |
 | `skills/` files (this restructure) | Synthesised from full session history |
+| CI fix: remove `--no-cache-dir` from ci.yml | Diagnosed contradiction between `cache: "pip"` and `--no-cache-dir` by reading GHA post-step failure |
+| Timezone fix: `appointment.py` + `index.html` | Traced 500 → `TypeError` from aware-vs-naive datetime comparison; proposed two-layer fix |
+| Mermaid architecture diagram | Generated from layer descriptions in docs/PROJECT.md |
+| Full README with badges and endpoint docs | Derived from project structure, CI workflow names, and `/health` route |
 
 ---
 
@@ -141,7 +154,7 @@ docker compose up --build
 
 **Repository:** https://github.com/naara011100/Capstone_Projekt_MediStock  
 **Branch:** `main`  
-**Tag `v1.0.0`** triggers the Release (GHCR Docker push) + CD (Render deploy) pipelines.
+**Latest tag: `v1.0.2`** — triggers the Release (GHCR Docker push) + CD (Render deploy) pipelines.
 
 ---
 
@@ -168,3 +181,17 @@ Detailed per-phase lessons are in the skill files.  Top six:
 6. **The AI is most useful when the domain is already specified.**
    Claude generated correct routers, ORM, and tests because the domain
    models and ABCs were precise.  Vague specs produce vague code.
+
+7. **`cache: "pip"` and `--no-cache-dir` are mutually exclusive in GitHub Actions.**
+   `actions/setup-python` saves pip's download cache in a post-step.
+   `pip install --no-cache-dir` prevents pip from writing to that directory,
+   leaving it empty and causing the post-step to fail — even when all tests
+   pass.  Use one or the other, not both.
+
+8. **`datetime.utcnow()` (naive) vs timezone-aware datetimes raises `TypeError`, not `ValueError`.**
+   The browser's `toISOString()` appends a `Z` suffix; Pydantic v2 parses this
+   as a timezone-aware `datetime`.  Comparing it against `datetime.utcnow()`
+   (naive) raises `TypeError`, which the router's `except ValueError` does not
+   catch — producing an unhandled HTTP 500.  Fix at both layers: normalise to
+   naive UTC in the domain model's `__post_init__`, and stop calling
+   `toISOString()` in the frontend.
