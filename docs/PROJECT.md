@@ -16,39 +16,69 @@ Architecture).  Business logic lives in the innermost layers and knows nothing
 about databases or HTTP; the outer layers adapt the core to concrete
 technologies.
 
-```
-┌───────────────────────────────────────────────────────────────────┐
-│                        Interfaces Layer                           │
-│  ┌──────────────────────────────────────────────────────────────┐ │
-│  │  FastAPI routers  (interfaces/api/routers/)                  │ │
-│  │  Static Web UI    (interfaces/web/static/)                   │ │
-│  └──────────────────────────────────────────────────────────────┘ │
-│                               │                                   │
-│                               ▼                                   │
-│  ┌──────────────────────────────────────────────────────────────┐ │
-│  │  Application Layer  (application/use_cases.py)               │ │
-│  │  BookingUseCase · InventoryUseCase                           │ │
-│  └──────────────────────────────────────────────────────────────┘ │
-│                               │                                   │
-│                               ▼                                   │
-│  ┌──────────────────────────────────────────────────────────────┐ │
-│  │  Domain Layer  (domain/)                                     │ │
-│  │  Models: Patient · Doctor · Room · Appointment               │ │
-│  │          Medication · StockItem                              │ │
-│  │  Services: BookingService · InventoryService                 │ │
-│  │  Abstract repos: AbstractAppointmentRepository               │ │
-│  │                  AbstractStockRepository                     │ │
-│  └──────────────────────────────────────────────────────────────┘ │
-│                               │                                   │
-│                               ▼                                   │
-│  ┌──────────────────────────────────────────────────────────────┐ │
-│  │  Infrastructure Layer  (infrastructure/)                     │ │
-│  │  SQLAlchemy ORM models (orm/models.py)                       │ │
-│  │  Repository impls (repositories/)                            │ │
-│  │  Database session (database.py)                              │ │
-│  │  Alembic migrations (alembic/)                               │ │
-│  └──────────────────────────────────────────────────────────────┘ │
-└───────────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph Interfaces["🌐 Interfaces Layer"]
+        R["FastAPI Routers\npatients · doctors · rooms\nappointments · inventory"]
+        UI["Web UI\nindex.html — 4-tab SPA"]
+        DI["DI Providers\ndb_dependencies.py"]
+    end
+
+    subgraph Application["⚙️ Application Layer"]
+        BUC["BookingUseCase\nbook · confirm · complete\ncancel · mark_no_show"]
+        IUC["InventoryUseCase\nadd_stock · dispense\nlist_all · low_stock_alerts"]
+    end
+
+    subgraph Domain["🧠 Domain Layer"]
+        subgraph Models["Models (dataclasses)"]
+            M1["Patient · Doctor · Room"]
+            M2["Appointment · Medication · StockItem"]
+        end
+        subgraph Services["Domain Services"]
+            BS["BookingService\nconflict detection"]
+            IS["InventoryService\nstock management"]
+        end
+        subgraph Abstractions["Abstract Repositories (ABCs)"]
+            AR["AbstractAppointmentRepository"]
+            SR["AbstractStockRepository"]
+        end
+    end
+
+    subgraph Infrastructure["🗄️ Infrastructure Layer"]
+        ORM["SQLAlchemy ORM Models\norm/models.py"]
+        REPOS["Repository Implementations\nSQLAlchemy*Repository ×6"]
+        DB["Database Session\ndatabase.py · get_db()"]
+        MIG["Alembic Migrations\nalembic/versions/"]
+        PG[("PostgreSQL 16")]
+    end
+
+    R --> DI
+    UI --> R
+    DI --> BUC
+    DI --> IUC
+    BUC --> BS
+    IUC --> IS
+    BS --> AR
+    IS --> SR
+    AR -.->|implemented by| REPOS
+    SR -.->|implemented by| REPOS
+    REPOS --> ORM
+    REPOS --> DB
+    ORM --> DB
+    DB --> PG
+    MIG --> PG
+
+    classDef interfaces fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef application fill:#ede9fe,stroke:#7c3aed,color:#2e1065
+    classDef domain fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef infra fill:#fef9c3,stroke:#ca8a04,color:#713f12
+    classDef db fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+
+    class R,UI,DI interfaces
+    class BUC,IUC application
+    class M1,M2,BS,IS,AR,SR domain
+    class ORM,REPOS,DB,MIG infra
+    class PG db
 ```
 
 ### Dependency rule
