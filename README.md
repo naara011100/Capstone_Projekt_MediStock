@@ -6,30 +6,30 @@
 [![Python](https://img.shields.io/badge/python-3.12-blue?logo=python)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100%2B-009688?logo=fastapi)](https://fastapi.tiangolo.com/)
 
-Hospital management REST API built with **FastAPI**, **SQLAlchemy**, and **PostgreSQL**.
-Handles patient registration, doctor scheduling, appointment booking, and medication inventory.
+REST-API zur Krankenhausverwaltung, entwickelt mit **FastAPI**, **SQLAlchemy** und **PostgreSQL**.  
+Verwaltet Patientenregistrierung, Arztplanung, Terminbuchung und Medikamentenbestand.
 
 ---
 
-## Live
+## Live-System
 
-| Endpoint | URL |
-|----------|-----|
-| Web UI | https://medistock.onrender.com/ui |
-| Swagger docs | https://medistock.onrender.com/docs |
-| Health check | https://medistock.onrender.com/health |
+| Bereich | URL |
+|---------|-----|
+| Web-Oberfläche | https://medistock.onrender.com/ui |
+| API-Dokumentation (Swagger) | https://medistock.onrender.com/docs |
+| Statusprüfung | https://medistock.onrender.com/health |
 
 ---
 
-## Health Endpoint
+## Health-Endpunkt
 
 ```
 GET /health
 ```
 
-Returns the current service status. No authentication required.
+Gibt den aktuellen Servicestatus zurück. Keine Authentifizierung erforderlich.
 
-**Response `200 OK`:**
+**Antwort `200 OK`:**
 
 ```json
 {
@@ -38,7 +38,7 @@ Returns the current service status. No authentication required.
 }
 ```
 
-Use this endpoint to verify the API is reachable before making other requests, or to wire up an uptime monitor.
+Dieser Endpunkt eignet sich zur Überprüfung der API-Erreichbarkeit sowie zur Anbindung an ein Uptime-Monitoring.
 
 ```bash
 curl https://medistock.onrender.com/health
@@ -46,94 +46,94 @@ curl https://medistock.onrender.com/health
 
 ---
 
-## Architecture
+## Architektur
 
-Four-layer Clean Architecture — domain logic has zero knowledge of FastAPI or SQLAlchemy.
+Vierschichtige Clean Architecture — die Domänenlogik hat keinerlei Kenntnis von FastAPI oder SQLAlchemy.
 
 ```
 Interfaces  →  Application  →  Domain  →  Infrastructure
 (FastAPI)      (UseCases)     (Models)    (SQLAlchemy / PostgreSQL)
 ```
 
-Full diagram and design decisions: [docs/PROJECT.md](docs/PROJECT.md)
+Vollständiges Architekturdiagramm und Designentscheidungen: [docs/PROJECT.md](docs/PROJECT.md)
 
 ---
 
-## API Reference
+## API-Übersicht
 
-| Resource | Base path | Operations |
-|----------|-----------|-----------|
-| Patients | `/api/v1/patients/` | list, create, get, deactivate |
-| Doctors | `/api/v1/doctors/` | list, create, get, deactivate |
-| Rooms | `/api/v1/rooms/` | list, create, get, toggle availability |
-| Appointments | `/api/v1/appointments/` | list, book, get, confirm, complete, cancel, no-show |
-| Medications | `/api/v1/inventory/medications` | list, create, get |
-| Stock | `/api/v1/inventory/stock` | list, low-stock alerts, add, dispense |
+| Ressource | Basispfad | Operationen |
+|-----------|-----------|-------------|
+| Patienten | `/api/v1/patients/` | auflisten, erstellen, abrufen, deaktivieren |
+| Ärzte | `/api/v1/doctors/` | auflisten, erstellen, abrufen, deaktivieren |
+| Räume | `/api/v1/rooms/` | auflisten, erstellen, abrufen, Verfügbarkeit ändern |
+| Termine | `/api/v1/appointments/` | auflisten, buchen, abrufen, bestätigen, abschließen, stornieren, nicht erschienen |
+| Medikamente | `/api/v1/inventory/medications` | auflisten, erstellen, abrufen |
+| Lagerbestand | `/api/v1/inventory/stock` | auflisten, Niedrigbestand-Warnungen, hinzufügen, ausgeben |
 
-Interactive documentation available at `/docs` (Swagger UI) and `/redoc`.
+Interaktive Dokumentation verfügbar unter `/docs` (Swagger UI) und `/redoc`.
 
 ---
 
-## Quick Start
+## Schnellstart
 
-### Local (with PostgreSQL running)
+### Lokal (mit laufendem PostgreSQL)
 
 ```bash
-# 1. Clone
+# 1. Repository klonen
 git clone https://github.com/naara011100/Capstone_Projekt_MediStock.git
 cd Capstone_Projekt_MediStock
 
-# 2. Install dependencies
+# 2. Abhängigkeiten installieren
 pip install -r requirements.txt
 
-# 3. Configure database
-cp .env.example .env          # then edit DATABASE_URL
+# 3. Datenbank konfigurieren
+cp .env.example .env          # DATABASE_URL anpassen
 
-# 4. Run migrations
+# 4. Datenbankmigrationen ausführen
 alembic upgrade head
 
-# 5. Start server
+# 5. Server starten
 uvicorn medistock.interfaces.api.main:app --reload
 # → http://127.0.0.1:8000/ui
 ```
 
-### Docker Compose (app + PostgreSQL, zero config)
+### Docker Compose (App + PostgreSQL, keine Konfiguration nötig)
 
 ```bash
 docker compose up --build
 # → http://localhost:8000/ui
 ```
 
-Migrations run automatically on container start via `entrypoint.sh`.
+Datenbankmigrationen werden beim Containerstart automatisch über `entrypoint.sh` ausgeführt.
 
 ---
 
 ## Tests
 
 ```bash
-# Unit tests — no database required (also runs in CI)
+# Unit-Tests — keine Datenbank erforderlich (wird auch in CI ausgeführt)
 pytest tests/unit/ -v
 
-# Full suite — requires medistock_test PostgreSQL database
+# Vollständige Testsuite — erfordert medistock_test PostgreSQL-Datenbank
 pytest
 ```
 
-103 tests across unit, integration, and end-to-end layers.
+103 Tests in den Schichten Unit, Integration und End-to-End.
 
 ---
 
-## Tech Stack
+## Technologie-Stack
 
-| Layer | Technology |
-|-------|-----------|
-| HTTP framework | FastAPI |
+| Schicht | Technologie |
+|---------|-------------|
+| HTTP-Framework | FastAPI |
 | ORM | SQLAlchemy 2.x |
-| Database | PostgreSQL 16 |
-| Migrations | Alembic |
-| Validation | Pydantic v2 |
+| Datenbank | PostgreSQL 16 |
+| Migrationen | Alembic |
+| Validierung | Pydantic v2 |
 | Container | Docker (python:3.12-slim, non-root) |
-| CI | GitHub Actions |
-| Registry | GitHub Container Registry (GHCR) |
+| CI/CD | GitHub Actions |
+| Image-Registry | GitHub Container Registry (GHCR) |
 | Hosting | Render |
 
 ---
@@ -141,5 +141,5 @@ pytest
 ## Repository
 
 **GitHub:** https://github.com/naara011100/Capstone_Projekt_MediStock  
-**AI-SDLC workflow:** [AGENTS.md](AGENTS.md)  
-**Use case specs:** [docs/specs/](docs/specs/)
+**KI-Entwicklungsdokumentation:** [AGENTS.md](AGENTS.md)  
+**Use-Case-Spezifikationen:** [docs/specs/](docs/specs/)
