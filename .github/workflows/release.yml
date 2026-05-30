@@ -32,11 +32,15 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            # e.g. v1.2.3 → 1.2.3
+            # e.g. v1.2.3 → ghcr.io/…/medistock:1.2.3
             type=semver,pattern={{version}}
-            # e.g. v1.2.3 → 1.2
+            # e.g. v1.2.3 → ghcr.io/…/medistock:1.2
             type=semver,pattern={{major}}.{{minor}}
-            # always push a short-sha tag for traceability
+            # e.g. v1.2.3 → ghcr.io/…/medistock:1
+            type=semver,pattern={{major}}
+            # ghcr.io/…/medistock:latest  (every version tag)
+            type=raw,value=latest
+            # ghcr.io/…/medistock:sha-<short-sha>  (traceability)
             type=sha,prefix=sha-
 
       - name: Set up Docker Buildx
