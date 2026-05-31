@@ -1,20 +1,19 @@
-# MediStock — Project Overview
+# MediStock — Projektübersicht
 
-## Goal
+## Ziel
 
-MediStock is a hospital management back-end that handles patient registration,
-doctor scheduling, room assignment, appointment booking, and medication
-inventory tracking.  It exposes a REST API (FastAPI) and a minimal web UI, and
-is designed to run in a Docker container backed by PostgreSQL.
+MediStock ist ein Backend-System zur Krankenhausverwaltung, das Patientenregistrierung,
+Arztplanung, Raumzuweisung, Terminbuchung und Medikamentenbestandsverwaltung übernimmt.
+Es stellt eine REST API (FastAPI) sowie eine einfache Web-Oberfläche bereit und ist
+für den Betrieb in einem Docker-Container mit PostgreSQL ausgelegt.
 
 ---
 
-## Architecture
+## Architektur
 
-MediStock follows **Clean Architecture** (also called Hexagonal or Onion
-Architecture).  Business logic lives in the innermost layers and knows nothing
-about databases or HTTP; the outer layers adapt the core to concrete
-technologies.
+MediStock folgt der **Clean Architecture** (auch Hexagonale oder Zwiebelarchitektur genannt).
+Die Geschäftslogik befindet sich in den innersten Schichten und hat keinerlei Kenntnis
+von Datenbanken oder HTTP; die äußeren Schichten passen den Kern an konkrete Technologien an.
 
 ```mermaid
 graph TD
@@ -81,105 +80,104 @@ graph TD
     class PG db
 ```
 
-### Dependency rule
+### Abhängigkeitsregel
 
-Arrows point **inward only**.  The domain layer imports nothing from
-infrastructure or interfaces.  Infrastructure imports domain interfaces
-(abstract repos, domain models).  The interfaces layer imports application
-use cases and, when needed, domain models for response serialization.
-
----
-
-## Layer Descriptions
-
-### Domain Layer (`medistock/domain/`)
-
-Contains the core business concepts with no external dependencies.
-
-| Module | Purpose |
-|--------|---------|
-| `models/patient.py` | Patient entity — validation, `full_name`, `deactivate()` |
-| `models/doctor.py` | Doctor entity — "Dr." prefix, specialization |
-| `models/room.py` | Room entity — availability toggle |
-| `models/appointment.py` | Appointment aggregate — status state machine, overlap detection |
-| `models/medication.py` | Medication entity |
-| `models/stock_item.py` | StockItem entity — `add_stock()`, `dispense()`, low-stock flag |
-| `services.py` | `BookingService` (conflict-checked booking), `InventoryService` (stock ops); abstract repository interfaces |
-
-All domain objects are Python `@dataclass` instances.  Validation runs in
-`__post_init__`.  Repositories bypass `__post_init__` via `object.__new__()` to
-avoid re-validating historical records loaded from the database.
-
-### Application Layer (`medistock/application/`)
-
-Thin orchestration layer between the HTTP interfaces and domain services.
-
-| Class | Responsibility |
-|-------|----------------|
-| `BookingUseCase` | Resolves patient / doctor / room IDs → objects, then delegates to `BookingService` |
-| `InventoryUseCase` | Resolves medication IDs → objects, then delegates to `InventoryService` |
-
-Raises `LookupError` for missing entities (→ HTTP 404) and lets domain
-`ValueError` propagate naturally (→ HTTP 422).
-
-### Infrastructure Layer (`medistock/infrastructure/`)
-
-Adapts the domain to PostgreSQL via SQLAlchemy.
-
-| Module | Purpose |
-|--------|---------|
-| `orm/models.py` | ORM mappings for all six domain entities |
-| `repositories/` | Concrete `SQLAlchemy*Repository` classes implementing the abstract repos |
-| `repositories/base.py` | `safe_commit()` context manager, domain↔ORM conversion helpers, `DuplicateEntryError` |
-| `database.py` | Engine, session factory, `get_db()` FastAPI dependency |
-
-### Interfaces Layer (`medistock/interfaces/`)
-
-Adapts the application layer to HTTP and HTML.
-
-| Module | Purpose |
-|--------|---------|
-| `api/main.py` | FastAPI app, middleware, router registration, static file mount |
-| `api/routers/` | One file per resource group: patients, doctors_rooms, appointments, inventory |
-| `api/db_dependencies.py` | FastAPI `Depends()` factories — wire repos, services, and use cases |
-| `web/static/index.html` | Single-page vanilla JS UI with four tabs |
+Pfeile zeigen **ausschließlich nach innen**. Die Domänenschicht importiert nichts aus
+der Infrastruktur oder den Interfaces. Die Infrastruktur importiert Domänen-Interfaces
+(abstrakte Repositories, Domänenmodelle). Die Interfaces-Schicht importiert Anwendungs-Use-Cases
+und bei Bedarf Domänenmodelle für die Antwortserialisierung.
 
 ---
 
-## Design Decisions
+## Schichtbeschreibungen
 
-### Why Clean Architecture?
+### Domänenschicht (`medistock/domain/`)
 
-The capstone project needed to demonstrate separation of concerns.  Clean
-Architecture makes each layer independently testable: unit tests mock
-repositories, integration tests swap the database via `get_db` override, and
-the domain runs in isolation without any framework.
+Enthält die zentralen Geschäftskonzepte ohne externe Abhängigkeiten.
 
-### Why dataclasses instead of Pydantic models in the domain?
+| Modul | Zweck |
+|-------|-------|
+| `models/patient.py` | Patient-Entity — Validierung, `full_name`, `deactivate()` |
+| `models/doctor.py` | Arzt-Entity — „Dr."-Präfix, Fachgebiet |
+| `models/room.py` | Raum-Entity — Verfügbarkeitsumschalter |
+| `models/appointment.py` | Termin-Aggregat — Status-Zustandsmaschine, Überschneidungserkennung |
+| `models/medication.py` | Medikamenten-Entity |
+| `models/stock_item.py` | Lagerartikel-Entity — `add_stock()`, `dispense()`, Niedrigbestand-Flag |
+| `services.py` | `BookingService` (Buchung mit Konflikterkennung), `InventoryService` (Lageroperationen); abstrakte Repository-Interfaces |
 
-Pydantic is used at the API boundary (request/response schemas).  Domain
-entities are plain Python dataclasses so they carry zero FastAPI or SQLAlchemy
-coupling; they can be tested or reused in a CLI or background worker without
-importing the web framework.
+Alle Domänenobjekte sind Python-`@dataclass`-Instanzen. Die Validierung läuft in
+`__post_init__`. Repositories umgehen `__post_init__` über `object.__new__()`, um
+historische Datenbankeinträge nicht erneut zu validieren.
 
-### Why `object.__new__()` in repository hydration?
+### Anwendungsschicht (`medistock/application/`)
 
-`__post_init__` validates constraints like "appointment must be in the future."
-Historical records loaded from the database would always fail that check.
-Bypassing `__post_init__` lets the ORM layer reconstruct domain objects from
-stored data without silently mutating or discarding them.
+Dünne Orchestrierungsschicht zwischen den HTTP-Interfaces und den Domänen-Services.
 
-### Why `safe_commit()` instead of try/except in every save()?
+| Klasse | Verantwortung |
+|--------|---------------|
+| `BookingUseCase` | Löst Patienten-/Arzt-/Raum-IDs zu Objekten auf, delegiert dann an `BookingService` |
+| `InventoryUseCase` | Löst Medikamenten-IDs zu Objekten auf, delegiert dann an `InventoryService` |
 
-Every `save()` method commits.  Wrapping the commit in a context manager
-that catches `IntegrityError` → `DuplicateEntryError` keeps the error-handling
-in one place and keeps repository code free of database-specific exceptions.
+Wirft `LookupError` bei fehlenden Entitäten (→ HTTP 404) und lässt domänenspezifische
+`ValueError` natürlich propagieren (→ HTTP 422).
 
-### Why an Application layer on top of the Domain services?
+### Infrastrukturschicht (`medistock/infrastructure/`)
 
-The booking workflow requires resolving three separate IDs (patient, doctor,
-room) before calling `BookingService.book_appointment()`.  Without a use case
-layer, each router endpoint would own that lookup logic, duplicating it if a
-second interface (CLI, gRPC) were added later.  The use case is also the right
-place for future cross-cutting concerns such as authorization checks or audit
-logging.
+Passt die Domäne über SQLAlchemy an PostgreSQL an.
+
+| Modul | Zweck |
+|-------|-------|
+| `orm/models.py` | ORM-Mappings für alle sechs Domänen-Entitäten |
+| `repositories/` | Konkrete `SQLAlchemy*Repository`-Klassen, die die abstrakten Repos implementieren |
+| `repositories/base.py` | `safe_commit()`-Context-Manager, Domäne↔ORM-Konvertierungshelfer, `DuplicateEntryError` |
+| `database.py` | Engine, Session-Factory, `get_db()` FastAPI-Dependency |
+
+### Interfaces-Schicht (`medistock/interfaces/`)
+
+Passt die Anwendungsschicht an HTTP und HTML an.
+
+| Modul | Zweck |
+|-------|-------|
+| `api/main.py` | FastAPI-App, Middleware, Router-Registrierung, Static-File-Mount |
+| `api/routers/` | Eine Datei pro Ressourcengruppe: patients, doctors_rooms, appointments, inventory |
+| `api/db_dependencies.py` | FastAPI-`Depends()`-Factories — verbinden Repos, Services und Use-Cases |
+| `web/static/index.html` | Single-Page Vanilla-JS-UI mit vier Tabs |
+
+---
+
+## Designentscheidungen
+
+### Warum Clean Architecture?
+
+Das Capstone-Projekt sollte Trennung der Verantwortlichkeiten demonstrieren. Clean Architecture
+macht jede Schicht unabhängig testbar: Unit-Tests mocken Repositories, Integrationstests
+tauschen die Datenbank über das `get_db`-Override aus, und die Domäne läuft isoliert ohne
+jegliches Framework.
+
+### Warum Dataclasses statt Pydantic-Modellen in der Domäne?
+
+Pydantic wird an der API-Grenze (Request-/Response-Schemas) eingesetzt. Domänen-Entitäten
+sind reine Python-Dataclasses, damit sie keine FastAPI- oder SQLAlchemy-Kopplung tragen;
+sie können ohne Import des Web-Frameworks in einem CLI oder Background-Worker getestet
+oder wiederverwendet werden.
+
+### Warum `object.__new__()` bei der Repository-Hydration?
+
+`__post_init__` prüft Constraints wie „Termin muss in der Zukunft liegen".
+Historische Datenbankeinträge würden diese Prüfung immer fehlschlagen lassen.
+Die Umgehung von `__post_init__` erlaubt der ORM-Schicht, Domänenobjekte aus
+gespeicherten Daten zu rekonstruieren, ohne sie stillschweigend zu verändern oder zu verwerfen.
+
+### Warum `safe_commit()` statt try/except in jedem `save()`?
+
+Jede `save()`-Methode führt einen Commit durch. Den Commit in einem Context-Manager zu
+kapseln, der `IntegrityError` → `DuplicateEntryError` umwandelt, hält die Fehlerbehandlung
+an einer Stelle und hält den Repository-Code frei von datenbankspezifischen Ausnahmen.
+
+### Warum eine Anwendungsschicht über den Domänen-Services?
+
+Der Buchungsworkflow erfordert die Auflösung von drei separaten IDs (Patient, Arzt, Raum)
+vor dem Aufruf von `BookingService.book_appointment()`. Ohne eine Use-Case-Schicht würde jeder
+Router-Endpunkt diese Lookup-Logik besitzen und sie duplizieren, falls später eine zweite
+Schnittstelle (CLI, gRPC) hinzugefügt wird. Der Use-Case ist auch der richtige Ort für
+zukünftige übergreifende Belange wie Autorisierungsprüfungen oder Audit-Logging.

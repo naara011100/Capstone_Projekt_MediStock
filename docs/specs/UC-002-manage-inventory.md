@@ -1,141 +1,141 @@
-# UC-002 — Manage Medication Inventory
+# UC-002 — Medikamentenbestand verwalten
 
-| Field | Value |
-|-------|-------|
+| Feld | Wert |
+|------|------|
 | **ID** | UC-002 |
-| **Name** | Manage Medication Inventory |
+| **Name** | Medikamentenbestand verwalten |
 | **Version** | 1.0 |
-| **Status** | Implemented |
-| **Layer** | `InventoryUseCase` → `InventoryService` |
-| **API endpoints** | `POST /api/v1/inventory/stock/add`, `POST /api/v1/inventory/stock/dispense` |
+| **Status** | Implementiert |
+| **Schicht** | `InventoryUseCase` → `InventoryService` |
+| **API-Endpunkte** | `POST /api/v1/inventory/stock/add`, `POST /api/v1/inventory/stock/dispense` |
 
 ---
 
-## Actors
+## Akteure
 
-| Actor | Role |
-|-------|------|
-| Pharmacist / Hospital Staff | Adds deliveries, dispenses medication |
-| MediStock System | Tracks quantities, raises low-stock alerts |
-
----
-
-## Preconditions
-
-- A **Medication** record identified by `medication_id` exists in the database.
-- For dispensing: a `StockItem` record exists for that medication.
+| Akteur | Rolle |
+|--------|-------|
+| Apotheker / Krankenhauspersonal | Nimmt Lieferungen entgegen, gibt Medikamente aus |
+| MediStock-System | Verfolgt Mengen, löst Niedrigbestand-Warnungen aus |
 
 ---
 
-## Use Case 1 — Add Stock
+## Vorbedingungen
 
-### Main Flow
+- Ein **Medikament**-Datensatz mit `medication_id` existiert in der Datenbank.
+- Für die Ausgabe: Ein `StockItem`-Datensatz für dieses Medikament existiert.
+
+---
+
+## Use-Case 1 — Bestand hinzufügen
+
+### Hauptablauf
 
 ```
-Staff → API: POST /api/v1/inventory/stock/add
-             { medication_id, amount, location }
+Personal → API: POST /api/v1/inventory/stock/add
+                { medication_id, amount, location }
 
-1. InventoryUseCase.add_stock() resolves medication_id → Medication domain object.
-   └─ If not found → LookupError("Medication not found.") → HTTP 404
+1. InventoryUseCase.add_stock() löst medication_id → Medication-Domänenobjekt auf.
+   └─ Falls nicht gefunden → LookupError("Medication not found.") → HTTP 404
 
-2. InventoryService.add_stock() checks for an existing StockItem for this medication.
-   └─ If none exists → creates a new StockItem(quantity=0, location=location)
+2. InventoryService.add_stock() prüft auf einen vorhandenen StockItem-Eintrag.
+   └─ Falls keiner existiert → erstellt neuen StockItem(quantity=0, location=location)
 
-3. StockItem.add_stock(amount) increases the quantity.
-   └─ amount must be > 0 → ValueError → HTTP 422
+3. StockItem.add_stock(amount) erhöht die Menge.
+   └─ amount muss > 0 sein → ValueError → HTTP 422
 
-4. StockRepository.save() persists the StockItem.
+4. StockRepository.save() speichert den StockItem.
 
-5. API returns HTTP 200 with StockItemResponse (includes is_low, is_out_of_stock flags).
+5. API gibt HTTP 200 mit StockItemResponse zurück (inkl. is_low, is_out_of_stock-Flags).
 ```
 
-### Business Rules
+### Geschäftsregeln
 
-| Rule | Where enforced |
-|------|----------------|
-| `amount` must be positive | `StockItem.add_stock()` |
-| One stock entry per medication (upsert semantics) | `InventoryService.add_stock()` |
+| Regel | Wo durchgesetzt |
+|-------|----------------|
+| `amount` muss positiv sein | `StockItem.add_stock()` |
+| Ein Lagereintrag pro Medikament (Upsert-Semantik) | `InventoryService.add_stock()` |
 
 ---
 
-## Use Case 2 — Dispense Stock
+## Use-Case 2 — Bestand ausgeben
 
-### Main Flow
+### Hauptablauf
 
 ```
-Staff → API: POST /api/v1/inventory/stock/dispense
-             { medication_id, amount }
+Personal → API: POST /api/v1/inventory/stock/dispense
+                { medication_id, amount }
 
-1. InventoryUseCase.dispense() resolves medication_id → Medication domain object.
-   └─ If not found → LookupError("Medication not found.") → HTTP 404
+1. InventoryUseCase.dispense() löst medication_id → Medication-Domänenobjekt auf.
+   └─ Falls nicht gefunden → LookupError("Medication not found.") → HTTP 404
 
-2. InventoryService.dispense() retrieves the StockItem.
-   └─ If no stock entry → ValueError("No stock entry found…") → HTTP 422
+2. InventoryService.dispense() ruft den StockItem ab.
+   └─ Falls kein Eintrag vorhanden → ValueError("No stock entry found…") → HTTP 422
 
-3. StockItem.dispense(amount) reduces the quantity.
-   └─ amount must be > 0             → ValueError → HTTP 422
-   └─ quantity must not go negative  → ValueError → HTTP 422
+3. StockItem.dispense(amount) reduziert die Menge.
+   └─ amount muss > 0 sein             → ValueError → HTTP 422
+   └─ Menge darf nicht negativ werden  → ValueError → HTTP 422
 
-4. StockRepository.save() persists the updated StockItem.
+4. StockRepository.save() speichert den aktualisierten StockItem.
 
-5. API returns HTTP 200 with StockItemResponse.
+5. API gibt HTTP 200 mit StockItemResponse zurück.
 ```
 
-### Business Rules
+### Geschäftsregeln
 
-| Rule | Where enforced |
-|------|----------------|
-| `amount` must be positive | `StockItem.dispense()` |
-| Quantity cannot go below zero (no negative stock) | `StockItem.dispense()` |
-| A stock entry must already exist before dispensing | `InventoryService.dispense()` |
+| Regel | Wo durchgesetzt |
+|-------|----------------|
+| `amount` muss positiv sein | `StockItem.dispense()` |
+| Menge darf nicht unter null sinken (kein negativer Bestand) | `StockItem.dispense()` |
+| Ein Lagereintrag muss vor der Ausgabe existieren | `InventoryService.dispense()` |
 
 ---
 
-## Use Case 3 — View Stock and Low-Stock Alerts
+## Use-Case 3 — Bestand und Niedrigbestand-Warnungen anzeigen
 
-### Main Flow
+### Hauptablauf
 
 ```
-Staff → API: GET /api/v1/inventory/stock
-             → list of all StockItemResponse objects
+Personal → API: GET /api/v1/inventory/stock
+                → Liste aller StockItemResponse-Objekte
 
-Staff → API: GET /api/v1/inventory/stock/low-stock
-             → filtered list where quantity ≤ low_stock_threshold (default: 10)
+Personal → API: GET /api/v1/inventory/stock/low-stock
+                → gefilterte Liste mit quantity ≤ low_stock_threshold (Standard: 10)
 ```
 
-### Business Rules
+### Geschäftsregeln
 
-| Rule | Where enforced |
-|------|----------------|
-| `is_low` flag = quantity ≤ `StockItem.LOW_STOCK_THRESHOLD` (10) | `StockItem.is_low` property |
-| `is_out_of_stock` flag = quantity ≤ 0 | `StockItem.is_out_of_stock` property |
-| Low-stock query uses a DB-level filter for performance | `SQLAlchemyStockRepository.list_low_stock()` |
-
----
-
-## Alternative Flows
-
-### A1 — Medication does not exist
-- Steps 1 of add or dispense fail.
-- Response: `HTTP 404 { "detail": "Medication not found." }`
-
-### A2 — Dispense more than available
-- Step 3 of dispense: `quantity - amount < 0`.
-- Response: `HTTP 422 { "detail": "Insufficient stock..." }`
-
-### A3 — No stock entry for medication
-- Step 2 of dispense: `StockRepository.get_by_medication()` returns `None`.
-- Response: `HTTP 422 { "detail": "No stock entry found for medication '...'." }`
+| Regel | Wo durchgesetzt |
+|-------|----------------|
+| `is_low`-Flag = quantity ≤ `StockItem.LOW_STOCK_THRESHOLD` (10) | `StockItem.is_low`-Property |
+| `is_out_of_stock`-Flag = quantity ≤ 0 | `StockItem.is_out_of_stock`-Property |
+| Niedrigbestand-Abfrage nutzt DB-seitigen Filter für Performance | `SQLAlchemyStockRepository.list_low_stock()` |
 
 ---
 
-## Post-conditions
+## Alternativabläufe
 
-- **Add**: `StockItem.quantity` increased by `amount`; row created if first delivery.
-- **Dispense**: `StockItem.quantity` decreased by `amount`; never goes below zero.
+### A1 — Medikament existiert nicht
+- Schritt 1 beim Hinzufügen oder Ausgeben schlägt fehl.
+- Antwort: `HTTP 404 { "detail": "Medication not found." }`
+
+### A2 — Ausgabe übersteigt verfügbaren Bestand
+- Schritt 3 beim Ausgeben: `quantity - amount < 0`.
+- Antwort: `HTTP 422 { "detail": "Insufficient stock..." }`
+
+### A3 — Kein Lagereintrag für Medikament vorhanden
+- Schritt 2 beim Ausgeben: `StockRepository.get_by_medication()` gibt `None` zurück.
+- Antwort: `HTTP 422 { "detail": "No stock entry found for medication '...'." }`
 
 ---
 
-## Related Use Cases
+## Nachbedingungen
 
-- UC-001 — Book Appointment (no dependency; concurrent workflows)
+- **Hinzufügen**: `StockItem.quantity` um `amount` erhöht; Datensatz erstellt, falls erste Lieferung.
+- **Ausgeben**: `StockItem.quantity` um `amount` reduziert; sinkt niemals unter null.
+
+---
+
+## Verwandte Use-Cases
+
+- UC-001 — Termin buchen (keine Abhängigkeit; parallele Workflows)

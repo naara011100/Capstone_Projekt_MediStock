@@ -1,123 +1,123 @@
-# UC-001 — Book Appointment
+# UC-001 — Termin buchen
 
-| Field | Value |
-|-------|-------|
+| Feld | Wert |
+|------|------|
 | **ID** | UC-001 |
-| **Name** | Book Appointment |
+| **Name** | Termin buchen |
 | **Version** | 1.0 |
-| **Status** | Implemented |
-| **Layer** | `BookingUseCase.book()` → `BookingService.book_appointment()` |
-| **API endpoint** | `POST /api/v1/appointments/` |
+| **Status** | Implementiert |
+| **Schicht** | `BookingUseCase.book()` → `BookingService.book_appointment()` |
+| **API-Endpunkt** | `POST /api/v1/appointments/` |
 
 ---
 
-## Actors
+## Akteure
 
-| Actor | Role |
-|-------|------|
-| Hospital Staff (Receptionist) | Initiates booking via the web UI or REST API |
-| MediStock System | Validates availability, detects conflicts, persists appointment |
-
----
-
-## Preconditions
-
-1. The **patient** identified by `patient_id` exists and is active.
-2. The **doctor** identified by `doctor_id` exists and is active.
-3. The **room** identified by `room_id` exists.
-4. The requested `scheduled_at` timestamp is in the future (UTC).
-5. `duration_minutes` is a positive integer.
+| Akteur | Rolle |
+|--------|-------|
+| Krankenhauspersonal (Rezeptionist) | Startet die Buchung über die Web-Oberfläche oder REST API |
+| MediStock-System | Prüft Verfügbarkeit, erkennt Konflikte, speichert den Termin |
 
 ---
 
-## Main Flow (Happy Path)
+## Vorbedingungen
+
+1. Der **Patient** mit `patient_id` existiert und ist aktiv.
+2. Der **Arzt** mit `doctor_id` existiert und ist aktiv.
+3. Der **Raum** mit `room_id` existiert.
+4. Der gewünschte `scheduled_at`-Zeitstempel liegt in der Zukunft (UTC).
+5. `duration_minutes` ist eine positive ganze Zahl.
+
+---
+
+## Hauptablauf (Happy Path)
 
 ```
-Staff → API: POST /api/v1/appointments/
-             { patient_id, doctor_id, room_id,
-               scheduled_at, duration_minutes, notes }
+Personal → API: POST /api/v1/appointments/
+                { patient_id, doctor_id, room_id,
+                  scheduled_at, duration_minutes, notes }
 
-1. BookingUseCase.book() resolves patient_id → Patient domain object.
-   └─ If not found → LookupError("Patient not found.") → HTTP 404
+1. BookingUseCase.book() löst patient_id → Patient-Domänenobjekt auf.
+   └─ Falls nicht gefunden → LookupError("Patient not found.") → HTTP 404
 
-2. BookingUseCase.book() resolves doctor_id → Doctor domain object.
-   └─ If not found → LookupError("Doctor not found.") → HTTP 404
+2. BookingUseCase.book() löst doctor_id → Doctor-Domänenobjekt auf.
+   └─ Falls nicht gefunden → LookupError("Doctor not found.") → HTTP 404
 
-3. BookingUseCase.book() resolves room_id → Room domain object.
-   └─ If not found → LookupError("Room not found.") → HTTP 404
+3. BookingUseCase.book() löst room_id → Room-Domänenobjekt auf.
+   └─ Falls nicht gefunden → LookupError("Room not found.") → HTTP 404
 
-4. BookingService.book_appointment() constructs an Appointment domain object.
-   Domain validation (Appointment.__post_init__):
-   └─ scheduled_at must be > utcnow()  → ValueError → HTTP 422
-   └─ duration_minutes must be > 0     → ValueError → HTTP 422
+4. BookingService.book_appointment() erstellt ein Appointment-Domänenobjekt.
+   Domänenvalidierung (Appointment.__post_init__):
+   └─ scheduled_at muss > utcnow() sein  → ValueError → HTTP 422
+   └─ duration_minutes muss > 0 sein     → ValueError → HTTP 422
 
-5. BookingService._check_conflicts() scans all SCHEDULED and CONFIRMED
-   appointments for time overlaps (based on start + duration):
-   └─ Same doctor already booked      → ValueError → HTTP 422
-   └─ Same patient already booked     → ValueError → HTTP 422
-   └─ Same room already booked        → ValueError → HTTP 422
+5. BookingService._check_conflicts() prüft alle SCHEDULED- und CONFIRMED-
+   Termine auf Zeitüberschneidungen (basierend auf Start + Dauer):
+   └─ Arzt bereits gebucht      → ValueError → HTTP 422
+   └─ Patient bereits gebucht   → ValueError → HTTP 422
+   └─ Raum bereits gebucht      → ValueError → HTTP 422
 
-6. AppointmentRepository.save() persists the new appointment (status = SCHEDULED).
+6. AppointmentRepository.save() speichert den neuen Termin (status = SCHEDULED).
 
-7. API returns HTTP 201 with AppointmentResponse.
+7. API gibt HTTP 201 mit AppointmentResponse zurück.
 ```
 
 ---
 
-## Alternative Flows
+## Alternativabläufe
 
-### A1 — Patient not found
-- Step 1 fails because no patient with the given UUID exists.
-- Response: `HTTP 404 { "detail": "Patient not found." }`
+### A1 — Patient nicht gefunden
+- Schritt 1 schlägt fehl, da kein Patient mit der angegebenen UUID existiert.
+- Antwort: `HTTP 404 { "detail": "Patient not found." }`
 
-### A2 — Doctor not found
-- Step 2 fails.
-- Response: `HTTP 404 { "detail": "Doctor not found." }`
+### A2 — Arzt nicht gefunden
+- Schritt 2 schlägt fehl.
+- Antwort: `HTTP 404 { "detail": "Doctor not found." }`
 
-### A3 — Room not found
-- Step 3 fails.
-- Response: `HTTP 404 { "detail": "Room not found." }`
+### A3 — Raum nicht gefunden
+- Schritt 3 schlägt fehl.
+- Antwort: `HTTP 404 { "detail": "Room not found." }`
 
-### A4 — Appointment in the past
-- Step 4 fails domain validation: `scheduled_at <= utcnow()`.
-- Response: `HTTP 422 { "detail": "Appointment must be scheduled in the future." }`
+### A4 — Termin in der Vergangenheit
+- Schritt 4 schlägt bei der Domänenvalidierung fehl: `scheduled_at <= utcnow()`.
+- Antwort: `HTTP 422 { "detail": "Appointment must be scheduled in the future." }`
 
-### A5 — Doctor has a conflicting appointment
-- Step 5 detects that the doctor has a SCHEDULED or CONFIRMED appointment
-  whose time window overlaps with the requested slot.
-- Response: `HTTP 422 { "detail": "Doctor '...' already has an appointment at ..." }`
+### A5 — Arzt hat einen Konflikttermin
+- Schritt 5 erkennt, dass der Arzt bereits einen SCHEDULED- oder CONFIRMED-Termin hat,
+  dessen Zeitfenster mit dem gewünschten Slot überlappt.
+- Antwort: `HTTP 422 { "detail": "Doctor '...' already has an appointment at ..." }`
 
-### A6 — Patient has a conflicting appointment
-- Same as A5 but for the patient.
-- Response: `HTTP 422 { "detail": "Patient '...' already has an appointment at ..." }`
+### A6 — Patient hat einen Konflikttermin
+- Wie A5, aber für den Patienten.
+- Antwort: `HTTP 422 { "detail": "Patient '...' already has an appointment at ..." }`
 
-### A7 — Room is already booked
-- Same as A5 but for the room.
-- Response: `HTTP 422 { "detail": "Room '...' is already booked at ..." }`
-
----
-
-## Post-conditions
-
-- A new `Appointment` record exists in the database with `status = SCHEDULED`.
-- The appointment ID is returned in the response body.
+### A7 — Raum bereits gebucht
+- Wie A5, aber für den Raum.
+- Antwort: `HTTP 422 { "detail": "Room '...' is already booked at ..." }`
 
 ---
 
-## Business Rules
+## Nachbedingungen
 
-| Rule | Where enforced |
-|------|----------------|
-| `scheduled_at` must be in the future | `Appointment.__post_init__` |
-| `duration_minutes` must be > 0 | `Appointment.__post_init__` |
-| No two active appointments may overlap for the same doctor | `BookingService._check_conflicts()` |
-| No two active appointments may overlap for the same patient | `BookingService._check_conflicts()` |
-| No two active appointments may occupy the same room at the same time | `BookingService._check_conflicts()` |
-| Only SCHEDULED / CONFIRMED appointments are checked for conflicts | `BookingService._check_conflicts()` |
+- Ein neuer `Appointment`-Datensatz existiert in der Datenbank mit `status = SCHEDULED`.
+- Die Termin-ID wird im Antwort-Body zurückgegeben.
 
 ---
 
-## Appointment Status State Machine
+## Geschäftsregeln
+
+| Regel | Wo durchgesetzt |
+|-------|----------------|
+| `scheduled_at` muss in der Zukunft liegen | `Appointment.__post_init__` |
+| `duration_minutes` muss > 0 sein | `Appointment.__post_init__` |
+| Zwei aktive Termine dürfen sich für denselben Arzt nicht überschneiden | `BookingService._check_conflicts()` |
+| Zwei aktive Termine dürfen sich für denselben Patienten nicht überschneiden | `BookingService._check_conflicts()` |
+| Zwei aktive Termine dürfen denselben Raum nicht gleichzeitig belegen | `BookingService._check_conflicts()` |
+| Nur SCHEDULED- / CONFIRMED-Termine werden auf Konflikte geprüft | `BookingService._check_conflicts()` |
+
+---
+
+## Termin-Status-Zustandsmaschine
 
 ```
            book()
@@ -138,6 +138,6 @@ COMPLETED      NO_SHOW
 
 ---
 
-## Related Use Cases
+## Verwandte Use-Cases
 
-- UC-002 — Manage Medication Inventory (parallel workflow, no dependency)
+- UC-002 — Medikamentenbestand verwalten (paralleler Workflow, keine Abhängigkeit)
