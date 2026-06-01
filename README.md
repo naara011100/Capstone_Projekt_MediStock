@@ -137,6 +137,8 @@ pytest
 | Hosting | Render |
 
 ---
+## Was haben wir selbst gemacht und was hat Claude Code generiert?
+Wir haben den Use Case, die Entitäten und alle Business Rules selbst definiert. Claude Code hat daraus Boilerplate, Tests, CI/CD und Infrastruktur-Code generiert. Alle Architekurentscheidungen (Clean Architecture, Repository Pattern, TDD) haben wir gemeinsam getroffen und bewusst verantwortet.
 
 ## Repository
 
